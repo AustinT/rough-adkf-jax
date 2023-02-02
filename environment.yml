@@ -1,0 +1,19 @@
+name: adkf-jax
+channels:
+  - conda-forge
+dependencies:
+  - python=3.8
+  - pip
+  # Standard data science stuff
+  - numpy
+  - tqdm
+  # ML libraries
+  - jax
+  # Developer tools
+  - pytest
+  - pre-commit
+  - coverage
+  # Notebooks
+  - jupyter
+  - pip:
+    - flax
