@@ -3,21 +3,29 @@ from __future__ import annotations
 
 from typing import NamedTuple
 
+import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
 
+def standard_positive_transform(x: jnp.array) -> jnp.array:
+    """Apply softplus transform to x."""
+    return jax.nn.softplus(x)
+
+def standard_inverse_transform(x: jnp.array) -> jnp.array:
+    """Implements inverse softplus transform."""
+    return jnp.log(jnp.exp(x) - 1)
 
 class GPParams(NamedTuple):
-    log_amplitude: jnp.array
-    log_noise: jnp.array
-    log_lengthscale: jnp.array
+    raw_amplitude: jnp.array
+    raw_noise: jnp.array
+    raw_lengthscale: jnp.array
 
 
 def rbf_kernel(x1: jnp.array, x2: jnp.array, params: GPParams) -> jnp.array:
     """Forward function for RBF kernel."""
 
     # Apply lengthscales
-    lengthscale = jnp.exp(params.log_lengthscale)
+    lengthscale = standard_positive_transform(params.raw_lengthscale)
     x1 = x1 / lengthscale
     x2 = x2 / lengthscale
 
@@ -30,12 +38,12 @@ def rbf_kernel(x1: jnp.array, x2: jnp.array, params: GPParams) -> jnp.array:
     pairwise_distances_squared = x1_norm_squared + x2_norm_squared.T - 2 * x1_dot_x2
 
     # Return kernel matrix
-    amplitude = jnp.exp(params.log_amplitude)
+    amplitude = standard_positive_transform(params.raw_amplitude)
     return amplitude * jnp.exp(-pairwise_distances_squared / 2)
 
 
 def _add_noise_to_kernel(k: jnp.array, params: GPParams) -> jnp.array:
-    noise = jnp.exp(params.log_noise)
+    noise = standard_positive_transform(params.raw_noise)
     return k + jnp.eye(k.shape[0]) * noise
 
 

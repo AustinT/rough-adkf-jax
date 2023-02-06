@@ -21,9 +21,9 @@ def xy_test():
 @pytest.fixture
 def gp_params():
     return adkf.gp.GPParams(
-        log_amplitude=jnp.array(math.log(2.0)),
-        log_noise=jnp.array(math.log(0.1)),
-        log_lengthscale=jnp.array(math.log(3.0)),
+        raw_amplitude=jnp.array(adkf.gp.standard_inverse_transform(2.0)),
+        raw_noise=jnp.array(adkf.gp.standard_inverse_transform(0.1)),
+        raw_lengthscale=jnp.array(adkf.gp.standard_inverse_transform(3.0)),
     )
 
 
