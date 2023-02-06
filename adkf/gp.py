@@ -7,13 +7,16 @@ import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
 
+
 def standard_positive_transform(x: jnp.array) -> jnp.array:
     """Apply softplus transform to x."""
     return jax.nn.softplus(x)
 
+
 def standard_inverse_transform(x: jnp.array) -> jnp.array:
     """Implements inverse softplus transform."""
     return jnp.log(jnp.exp(x) - 1)
+
 
 class GPParams(NamedTuple):
     raw_amplitude: jnp.array
