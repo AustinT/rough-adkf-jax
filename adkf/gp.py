@@ -24,6 +24,7 @@ class GPParams(NamedTuple):
     raw_lengthscale: jnp.array
 
 
+@jax.jit
 def rbf_kernel(x1: jnp.array, x2: jnp.array, params: GPParams) -> jnp.array:
     """Forward function for RBF kernel."""
 
@@ -50,6 +51,7 @@ def _add_noise_to_kernel(k: jnp.array, params: GPParams) -> jnp.array:
     return k + jnp.eye(k.shape[0]) * noise
 
 
+@jax.jit
 def train_mll(x: jnp.array, y: jnp.array, params: GPParams) -> jnp.array:
     """
     Return marginal log likelihood for labels y at locations x
@@ -63,6 +65,7 @@ def train_mll(x: jnp.array, y: jnp.array, params: GPParams) -> jnp.array:
     return jsp.stats.multivariate_normal.logpdf(y, jnp.zeros_like(y), K_with_noise)
 
 
+@jax.jit
 def gp_predictive_distribution(
     x_query: jnp.array, x_train: jnp.array, y_train: jnp.array, params: GPParams
 ) -> tuple[jnp.array, jnp.array]:
@@ -86,6 +89,7 @@ def gp_predictive_distribution(
     return mu, sigma
 
 
+@jax.jit
 def predictive_mll(
     x_query: jnp.array,
     y_query: jnp.array,
