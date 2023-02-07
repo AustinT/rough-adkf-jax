@@ -2,6 +2,12 @@
 
 First attempt that writing a simple version of ADKF in `jax`.
 
+Next steps:
+
+- Better GP implementation (e.g. multiple choices for base kernel). Could look at GP Jax.
+- Flexible `L_T` and `L_V` functions
+- Incorporate automatic implicit differentiation from `jaxopt`
+
 ## Development
 
 **!!PLEASE READ THIS SECTION BEFORE COMMITING ANY CODE TO THIS REPO!!**
