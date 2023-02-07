@@ -10,7 +10,7 @@ import jax.scipy as jsp
 
 def standard_positive_transform(x: jnp.array) -> jnp.array:
     """Apply softplus transform to x."""
-    return jax.nn.softplus(x)
+    return jax.nn.softplus(x) + 1e-6  # hard-coded epsilon
 
 
 def standard_inverse_transform(x: jnp.array) -> jnp.array:

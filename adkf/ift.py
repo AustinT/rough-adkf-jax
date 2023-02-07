@@ -7,6 +7,7 @@ from typing import Any, Callable, TypedDict
 
 import jax
 import jax.numpy as jnp
+import jaxopt
 from flax import linen as nn
 import optax
 
@@ -62,7 +63,7 @@ def optimize_train_loss_adam(
     y_train: jnp.ndarray,
     feature_extractor: nn.Module,
     tol: float = 1e-4,
-) -> DeepKernelGPParams:
+) -> Any:
 
     # Initialize optimizer
     optimizer = optax.adam(1e-2)
@@ -104,6 +105,30 @@ def optimize_train_loss_adam(
         f" grad={grads}"
     )
     return adapt_params
+
+
+def optimize_train_loss_lbfgs(
+    adapt_params: Any,
+    meta_params: Any,
+    param_combine_fn: param_combine_type,
+    x_train: jnp.ndarray,
+    y_train: jnp.ndarray,
+    feature_extractor: nn.Module,
+) -> Any:
+
+    # Wrapper function just depends just on adapt params
+    def _lbfgs_obj(p):
+        return train_mll_loss(
+            p, meta_params, param_combine_fn, x_train, y_train, feature_extractor
+        )
+
+    # Optimize training loss
+    solver = jaxopt.ScipyMinimize(
+        method="L-BFGS-B",
+        fun=_lbfgs_obj,
+    )
+    res = solver.run(adapt_params)
+    return res.params
 
 
 def ift_gradient_update(
@@ -150,7 +175,8 @@ def ift_gradient_update(
     )
 
     # Find gradients of validation loss
-    val, grad = jax.value_and_grad(pred_mll_loss, argnums=(0, 1))(
+    L_V = pred_mll_loss  # could change this to be a parameter
+    val, grad = jax.value_and_grad(L_V, argnums=(0, 1))(
         adapt_params,
         meta_params,
         param_combine_fn,

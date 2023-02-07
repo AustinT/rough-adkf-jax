@@ -18,3 +18,4 @@ dependencies:
   - pip:
     - flax
     - optax
+    - jaxopt
