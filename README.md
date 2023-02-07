@@ -7,6 +7,7 @@ Next steps:
 - Better GP implementation (e.g. multiple choices for base kernel). Could look at GP Jax.
 - Flexible `L_T` and `L_V` functions
 - Incorporate automatic implicit differentiation from `jaxopt`
+- vectorize ADKF using vmap to do multiple tasks in a single batch (not 100% sure it is possible, but maybe it is?)
 
 ## Development
 
