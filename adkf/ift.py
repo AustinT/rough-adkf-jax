@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import math
 import logging
-from typing import Any, Callable, TypedDict
+from typing import Any, Callable, TypedDict, Dict
 
 import jax
 import jax.numpy as jnp
@@ -11,48 +11,31 @@ import jaxopt
 from flax import linen as nn
 import optax
 
-from .gp import GPParams, train_mll, predictive_mll
-
 logger = logging.getLogger(__name__)
 
 
 class DeepKernelGPParams(TypedDict):
     feature_extractor: Any
-    gp: GPParams
+    gp: Dict
 
 
 param_combine_type = Callable[[Any, Any], DeepKernelGPParams]
-
-
-def train_mll_loss(
-    adapt_params: Any,
-    meta_params: Any,
-    param_combine_fn: param_combine_type,
-    x: jnp.ndarray,
-    y: jnp.ndarray,
-    feature_extractor: nn.Module,
-):
-    all_params = param_combine_fn(adapt_params, meta_params)
-    z = feature_extractor.apply(all_params["feature_extractor"], x)
-    return -train_mll(z, y, all_params["gp"])
-
-
-def pred_mll_loss(
-    adapt_params: Any,
-    meta_params: Any,
-    param_combine_fn: param_combine_type,
-    x: jnp.ndarray,
-    y: jnp.ndarray,
-    x_q: jnp.ndarray,
-    y_q: jnp.ndarray,
-    feature_extractor: nn.Module,
-):
-    all_params = param_combine_fn(adapt_params, meta_params)
-    z = feature_extractor.apply(all_params["feature_extractor"], x)
-    z_q = feature_extractor.apply(all_params["feature_extractor"], x_q)
-    return -predictive_mll(
-        x_query=z_q, y_query=y_q, x_train=z, y_train=y, params=all_params["gp"]
-    )
+adapt_loss_type = Callable[
+    [Any, Any, param_combine_type, jnp.ndarray, jnp.ndarray, nn.Module], float
+]
+meta_loss_type = Callable[
+    [
+        Any,
+        Any,
+        param_combine_type,
+        jnp.ndarray,
+        jnp.ndarray,
+        jnp.ndarray,
+        jnp.ndarray,
+        nn.Module,
+    ],
+    float,
+]
 
 
 def optimize_train_loss_adam(
@@ -62,6 +45,7 @@ def optimize_train_loss_adam(
     x_train: jnp.ndarray,
     y_train: jnp.ndarray,
     feature_extractor: nn.Module,
+    adapt_loss: adapt_loss_type,
     tol: float = 1e-4,
 ) -> Any:
 
@@ -74,8 +58,7 @@ def optimize_train_loss_adam(
     last_val = math.inf
     n_steps = 0
     while last_change > tol:
-        # NOTE: train_mll_loss could be made into an adjustable parameter in the future
-        val, grads = jax.value_and_grad(train_mll_loss, argnums=0)(
+        val, grads = jax.value_and_grad(adapt_loss, argnums=0)(
             adapt_params,
             meta_params,
             param_combine_fn,
@@ -114,11 +97,12 @@ def optimize_train_loss_lbfgs(
     x_train: jnp.ndarray,
     y_train: jnp.ndarray,
     feature_extractor: nn.Module,
+    adapt_loss: adapt_loss_type,
 ) -> Any:
 
     # Wrapper function just depends just on adapt params
     def _lbfgs_obj(p):
-        return train_mll_loss(
+        return adapt_loss(
             p, meta_params, param_combine_fn, x_train, y_train, feature_extractor
         )
 
@@ -140,6 +124,9 @@ def ift_gradient_update(
     x_pred: jnp.ndarray,
     y_pred: jnp.ndarray,
     feature_extractor: nn.Module,
+    adapt_loss: adapt_loss_type,
+    meta_loss: meta_loss_type,
+    fix_singular_hessian: bool = False,
 ) -> tuple[jnp.ndarray, Any]:
     """Performs IFT gradient update. NOTE: assumes adapt_params are already optimized."""
 
@@ -148,7 +135,7 @@ def ift_gradient_update(
     meta_params_flat, meta_unflatten = jax.flatten_util.ravel_pytree(meta_params)
 
     # Form Hessian and cross-derivatives
-    L_T = train_mll_loss  # could change this to be a parameter
+    L_T = adapt_loss
     hes = jax.jacfwd(jax.jacrev(L_T))(
         adapt_params,
         meta_params,
@@ -169,13 +156,22 @@ def ift_gradient_update(
     # Solve for d_adapt / d_meta
     hes_array, _ = jax.flatten_util.ravel_pytree(hes)
     cross_array, _ = jax.flatten_util.ravel_pytree(cross_derivs)
+
+    hes_matrix = hes_array.reshape(len(adapt_params_flat), len(adapt_params_flat))
+    cross_matrix = cross_array.reshape(len(adapt_params_flat), len(meta_params_flat))
+
+    if fix_singular_hessian and jnp.linalg.det(hes_matrix) == 0:
+        eig_val, eig_vec = jnp.linalg.eigh(hes_matrix)
+        new_eig_val = eig_val.at[eig_val == 0].set(1e-6)
+        hes_matrix = eig_vec @ jnp.diag(new_eig_val) @ jnp.linalg.inv(eig_vec)
+
     d_adapt_by_d_meta = -jnp.linalg.solve(
-        hes_array.reshape(len(adapt_params_flat), len(adapt_params_flat)),
-        cross_array.reshape(len(adapt_params_flat), len(meta_params_flat)),
+        hes_matrix,
+        cross_matrix,
     )
 
     # Find gradients of validation loss
-    L_V = pred_mll_loss  # could change this to be a parameter
+    L_V = meta_loss
     val, grad = jax.value_and_grad(L_V, argnums=(0, 1))(
         adapt_params,
         meta_params,
