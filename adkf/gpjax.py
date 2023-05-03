@@ -1,4 +1,4 @@
-from typing import Any, Callable
+from typing import Any
 
 import jax
 import jax.numpy as jnp
@@ -6,7 +6,6 @@ import jax.scipy as jsp
 import jaxutils
 
 import gpjax as gpx
-from jax import jit
 import jaxkern as jk
 
 
@@ -61,22 +60,17 @@ def gpx_to_ift(gpx_params: Any) -> Any:
     }
 
 
-def neg_mll(x: jnp.ndarray, y: jnp.ndarray) -> Callable[[Any], float]:
-    """Creates a function to calculate the neg marginal likelihood."""
-    dataset = jaxutils.Dataset(X=x, y=y.reshape(-1, 1))
-    prior, likelihood = setup_gp(num_datapoints=x.shape[0])
-    posterior = prior * likelihood
-    mll = jit(posterior.marginal_log_likelihood(dataset, negative=True))
-    return lambda param: mll(ift_to_gpx(param))
-
-
 def train_mll(x: jnp.array, y: jnp.array, params: Any) -> jnp.array:
     """
     Return marginal log likelihood for labels y at locations x
     under an RBF GP prior with hyperparameters given in `params`
     """
-    # To maintain same interface with original gp module, remove if not needed
-    return -neg_mll(x, y)(params)
+    dataset = jaxutils.Dataset(X=x, y=y.reshape(-1, 1))
+    prior, likelihood = setup_gp(num_datapoints=x.shape[0])
+    posterior = prior * likelihood
+    return posterior.marginal_log_likelihood(dataset, negative=False)(
+        ift_to_gpx(params)
+    )
 
 
 @jax.jit
