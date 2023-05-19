@@ -1,6 +1,7 @@
 name: adkf-jax
 channels:
   - conda-forge
+  - nvidia
 dependencies:
   - python=3.8
   - pip
@@ -8,7 +9,9 @@ dependencies:
   - numpy
   - tqdm
   # ML libraries
+  - jaxlib=*=*cuda*
   - jax
+  - cuda-nvcc
   # Developer tools
   - pytest
   - pre-commit
@@ -19,3 +22,4 @@ dependencies:
     - flax
     - optax
     - jaxopt
+    - gpjax==0.5.9

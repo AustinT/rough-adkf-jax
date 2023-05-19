@@ -15,7 +15,7 @@ def standard_positive_transform(x: jnp.array) -> jnp.array:
 
 def standard_inverse_transform(x: jnp.array) -> jnp.array:
     """Implements inverse softplus transform."""
-    return jnp.log(jnp.exp(x) - 1)
+    return jnp.log(jnp.exp(x - 1e-6) - 1)
 
 
 class GPParams(NamedTuple):
